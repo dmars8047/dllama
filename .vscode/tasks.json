@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Create bin folder",
+            "type": "shell",
+            "command": "mkdir -p bin",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build dllama",
+            "type": "shell",
+            "command": "go build -o bin/dllama main.go",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": "Create bin folder",
+            "problemMatcher": []
+        }
+    ]
+}

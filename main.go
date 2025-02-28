@@ -4,13 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"time"
 )
 
 // const ollamaUrl = "http://bulbasaur.bearded-piano.ts.net:11434"
@@ -35,7 +39,7 @@ func main() {
 	var config bool
 	var listModels bool
 
-	flag.StringVar(&ollamaUrl, "url", "", "The url of the ollama server. Most likely this is something like http://localhost:11434")
+	flag.StringVar(&ollamaUrl, "url", "", "The url of the ollama server. Most likely this is something like http://localhost:11434 or http://myserver:11434.")
 	flag.StringVar(&model, "model", "", "The model to use for the chat")
 	flag.BoolVar(&config, "config", false, "Whether to configure the chat")
 	flag.BoolVar(&listModels, "list-models", false, "List all available models")
@@ -60,12 +64,25 @@ func main() {
 
 		fmt.Printf("\nCalling %s to get available models...\n", url)
 
-		defaultModel = promptForModelSelection(url)
+		defaultModel, err := promptForModelSelection(url)
+
+		if err != nil {
+			if err == ErrOllamaServerConnection {
+				fmt.Printf("\nCould not connect to server. Please ensure the server is running and the url is correct.\n\n")
+				return
+			} else if err == ErrInvalidURL {
+				fmt.Printf("\nAttempted url is invalid. Please try again.\n\n")
+				return
+			}
+
+			fmt.Printf("\nError fetching models from ollama server: %v\n\n", err)
+			return
+		}
 
 		config.Url = url
 		config.DefaultModel = defaultModel
 
-		err := saveToConfigFile(&config)
+		err = saveToConfigFile(&config)
 
 		if err != nil {
 			fmt.Printf("Error saving config: %v\n", err)
@@ -104,14 +121,19 @@ func main() {
 	}
 
 	if listModels {
-		models := fetchAvailableModels(ollamaUrl)
+		models, err := fetchAvailableModels(ollamaUrl)
 
-		if models == nil {
-			fmt.Println("Error getting models")
+		if err != nil {
+			if err == ErrOllamaServerConnection {
+				fmt.Printf("Could not connect to server. Please ensure the server is running and the url is correct.\n")
+				return
+			}
+
+			fmt.Printf("Error fetching models from ollama server: %v\n", err)
 			return
 		}
 
-		fmt.Printf("\nAvailable models:\n\n")
+		fmt.Printf("Available models:\n\n")
 
 		for _, m := range models {
 			fmt.Println(m)
@@ -148,7 +170,9 @@ func main() {
 
 		fmt.Println()
 
-		httpClient := http.Client{}
+		httpClient := http.Client{
+			Timeout: time.Second * 300,
+		}
 
 		// Create chat request with history
 		chatRequest := ChatRequest{
@@ -164,7 +188,14 @@ func main() {
 			return
 		}
 
-		resp, err := httpClient.Post(ollamaUrl+"/api/chat", "application/json", bytes.NewBuffer(reqBody))
+		chatPath, err := url.JoinPath(ollamaUrl, "/api/chat")
+
+		if err != nil {
+			fmt.Printf("Error joining url path: %v\n", err)
+			return
+		}
+
+		resp, err := httpClient.Post(ollamaUrl, "application/json", bytes.NewBuffer(reqBody))
 
 		if err != nil {
 			fmt.Printf("Error sending request: %v\n", err)
@@ -211,14 +242,41 @@ func main() {
 	fmt.Println()
 }
 
-func fetchAvailableModels(ollamaUrl string) []string {
-	httpClient := http.Client{}
+func fetchAvailableModels(ollamaUrl string) ([]string, error) {
+	httpClient := http.Client{
+		Timeout: time.Second * 10,
+	}
 
-	resp, err := httpClient.Get(ollamaUrl + "/api/tags")
+	fetchModelsPath, err := url.JoinPath(ollamaUrl, "/api/tags")
 
 	if err != nil {
-		fmt.Printf("Error getting models: %v\n", err)
-		return nil
+		fmt.Printf("Error joining url path: %v\n", err)
+		return nil, err
+	}
+
+	resp, err := httpClient.Get(fetchModelsPath)
+
+	if err != nil {
+		var dnsError *net.DNSError
+		if errors.As(err, &dnsError) {
+			return nil, ErrOllamaServerConnection
+		}
+
+		var procError *url.Error
+
+		if errors.As(err, &procError) {
+			return nil, ErrInvalidURL
+		}
+
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, ErrOllamaServerConnection
+		} else {
+			return nil, fmt.Errorf("error getting models: %v", resp.Status)
+		}
 	}
 
 	defer resp.Body.Close()
@@ -232,7 +290,7 @@ func fetchAvailableModels(ollamaUrl string) []string {
 
 		if err != nil {
 			fmt.Printf("Error decoding response: %v\n", err)
-			return nil
+			return nil, err
 		}
 	}
 
@@ -242,7 +300,7 @@ func fetchAvailableModels(ollamaUrl string) []string {
 		models = append(models, m.Name)
 	}
 
-	return models
+	return models, err
 }
 
 func saveToConfigFile(config *DLLamaConfig) error {
@@ -307,12 +365,11 @@ func readFromConfigFile() (*DLLamaConfig, error) {
 	return &config, nil
 }
 
-func promptForModelSelection(url string) string {
-	models := fetchAvailableModels(url)
+func promptForModelSelection(url string) (string, error) {
+	models, err := fetchAvailableModels(url)
 
-	if models == nil {
-		fmt.Println("Error getting models")
-		return ""
+	if err != nil {
+		return "", err
 	}
 
 	fmt.Printf("\nAvailable models:\n\n")
@@ -343,7 +400,7 @@ func promptForModelSelection(url string) string {
 		break
 	}
 
-	return models[selection-1]
+	return models[selection-1], nil
 }
 
 type ChatRequest struct {
@@ -402,3 +459,5 @@ type ModelDetails struct {
 }
 
 var ErrConfigFileNotFound = fmt.Errorf("config file does not exist")
+var ErrOllamaServerConnection = fmt.Errorf("could not connect to server")
+var ErrInvalidURL = fmt.Errorf("invalid url")
