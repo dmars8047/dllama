@@ -4,7 +4,7 @@ A simple terminal interface to chat with a remote or local instance Ollama.
 ## Installation
 
 ```bash
-go install github.com/ollama/dllama@latest
+go install github.com/dmars8047/dllama@latest
 ```
 
 ## Usage
