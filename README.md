@@ -38,5 +38,5 @@ This will create a configuration file with default values for your Ollama URL an
 - `-config`: Create a configuration file.
 - `-help`: Display help information.
 - `-list-models`: List available models.
-- `-model <model>`: Set the default model.
+- `-model <model>`: Sets the model to use when chatting with Ollama.
 - `-url <url>`: Set the Ollama URL.
