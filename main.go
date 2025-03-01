@@ -21,18 +21,17 @@ import (
 
 const configFileName = "config.json"
 const defaultOllamaUrl = "http://localhost:11434"
-const logo = ` 
- ┓┓ ┓       
+const logo = ` ┓┓ ┓       
 ┏┫┃ ┃┏┓┏┳┓┏┓
 ┗┻┗┛┗┗┻┛┗┗┗┻
-
-v0.0.1
 `
+const versionNumber = "v0.0.4"
 
 // A program that lets your talk to ollama from the command line and formats the responses nicely and streams the responses
 // back to the user in real time.
 func main() {
-	fmt.Printf("%s\n", logo)
+	fmt.Printf("%s", logo)
+	fmt.Printf("\033[90m%s\033[0m\n\n", versionNumber)
 
 	var ollamaUrl string
 	var model string
@@ -149,7 +148,10 @@ func main() {
 	var conversationHistory []ChatMessage
 
 	for {
-		fmt.Printf("Enter your prompt (or type 'exit' to quit): \n\n")
+		fmt.Printf("\033[96m### Enter your prompt (or type 'exit' to quit) ###\033[0m \n\n")
+
+		var userTimeStamp time.Time = time.Now().UTC()
+		fmt.Printf("\033[92m[%s]: \033[0m", userTimeStamp.Local().Format("2006-01-02 15:04:05"))
 
 		prompt, err := reader.ReadString('\n')
 		if err != nil {
@@ -164,8 +166,9 @@ func main() {
 		}
 
 		conversationHistory = append(conversationHistory, ChatMessage{
-			Role:    "user",
-			Content: prompt,
+			Role:         "user",
+			Content:      prompt,
+			TimeStampUTC: userTimeStamp,
 		})
 
 		fmt.Println()
@@ -207,6 +210,9 @@ func main() {
 		scanner := bufio.NewScanner(resp.Body)
 
 		var assistantResponse string
+		var assistantTimeStamp time.Time = time.Now().UTC()
+
+		fmt.Printf("\033[93m[%s]: \033[0m", assistantTimeStamp.Local().Format("2006-01-02 15:04:05"))
 
 		for scanner.Scan() {
 			var streamResp StreamResponse
@@ -232,8 +238,9 @@ func main() {
 		}
 
 		conversationHistory = append(conversationHistory, ChatMessage{
-			Role:    "assistant",
-			Content: assistantResponse,
+			Role:         "assistant",
+			Content:      assistantResponse,
+			TimeStampUTC: assistantTimeStamp,
 		})
 
 		fmt.Println()
@@ -410,8 +417,9 @@ type ChatRequest struct {
 }
 
 type ChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role         string    `json:"role"`
+	Content      string    `json:"content"`
+	TimeStampUTC time.Time `json:"timestamp_utc"`
 }
 
 type StreamResponse struct {
