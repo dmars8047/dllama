@@ -27,7 +27,7 @@ const logo = ` ┓┓ ┓
 ┏┫┃ ┃┏┓┏┳┓┏┓
 ┗┻┗┛┗┗┻┛┗┗┗┻
 `
-const versionNumber = "v0.0.4"
+const versionNumber = "v0.0.5"
 
 // A program that lets your talk to ollama from the command line and formats the responses nicely and streams the responses
 // back to the user in real time.
@@ -42,7 +42,7 @@ func main() {
 
 	flag.StringVar(&ollamaUrl, "url", "", "The url of the ollama server. Most likely this is something like http://localhost:11434 or http://myserver:11434.")
 	flag.StringVar(&model, "model", "", "The model to use for the chat")
-	flag.BoolVar(&config, "config", false, "Whether to configure the chat")
+	flag.BoolVar(&config, "config", false, "Enters configuration mode. This will prompt you for the url and the default model to use. This will be saved to a config file.")
 	flag.BoolVar(&listModels, "list-models", false, "List all available models")
 
 	// Parse the flags
