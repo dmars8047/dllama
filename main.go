@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/chzyer/readline"
 )
 
 // const ollamaUrl = "http://bulbasaur.bearded-piano.ts.net:11434"
@@ -143,23 +145,28 @@ func main() {
 		return
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	rl, err := readline.New("\033[93m>> \033[0m")
+
+	if err != nil {
+		fmt.Printf("Error initializing readline: %v\n", err)
+		return
+	}
+
+	defer rl.Close()
 
 	var conversationHistory []ChatMessage
 
 	for {
 		fmt.Printf("\033[96m### Enter your prompt (or type 'exit' to quit) ###\033[0m \n\n")
 
-		var userTimeStamp time.Time = time.Now().UTC()
-		fmt.Printf("\033[92m[%s]: \033[0m", userTimeStamp.Local().Format("2006-01-02 15:04:05"))
+		// fmt.Printf("\033[92m[%s]: \033[0m", userTimeStamp.Local().Format("2006-01-02 15:04:05"))
 
-		prompt, err := reader.ReadString('\n')
+		prompt, err := rl.Readline()
+
 		if err != nil {
 			fmt.Printf("\nError reading input: %v", err)
 			return
 		}
-
-		prompt = prompt[:len(prompt)-1]
 
 		if prompt == "exit" {
 			break
@@ -168,7 +175,7 @@ func main() {
 		conversationHistory = append(conversationHistory, ChatMessage{
 			Role:         "user",
 			Content:      prompt,
-			TimeStampUTC: userTimeStamp,
+			TimeStampUTC: time.Now().UTC(),
 		})
 
 		fmt.Println()
