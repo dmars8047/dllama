@@ -195,7 +195,7 @@ func main() {
 			return
 		}
 
-		resp, err := httpClient.Post(ollamaUrl, "application/json", bytes.NewBuffer(reqBody))
+		resp, err := httpClient.Post(chatPath, "application/json", bytes.NewBuffer(reqBody))
 
 		if err != nil {
 			fmt.Printf("Error sending request: %v\n", err)
